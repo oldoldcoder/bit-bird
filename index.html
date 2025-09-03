@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素小鸟游戏</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>像素小鸟</h1>
+            <div class="score-display">
+                <span>得分: </span>
+                <span id="score">0</span>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="game-controls">
+            <div class="mode-select">
+                <button id="singleBtn">单人游戏</button>
+                <button id="multiBtn">双人对战</button>
+            </div>
+            <button id="startBtn">开始游戏</button>
+            <button id="restartBtn" style="display: none;">重新开始</button>
+            <p class="instructions">点击屏幕或按空格键让小鸟飞翔</p>
+        </div>
+        
+        <div class="game-over" id="gameOver" style="display: none;">
+            <h2>游戏结束!</h2>
+            <p>最终得分: <span id="finalScore">0</span></p>
+            <button id="playAgainBtn">再玩一次</button>
+        </div>
+
+        <div class="waiting-overlay" id="waiting" style="display: none;">
+            <div class="waiting-box">
+                <p id="waitingText">匹配对手中...</p>
+                <button id="readyStartBtn" disabled>开始(等待对手)</button>
+                <div id="countdown" class="countdown" style="display:none;">3</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
