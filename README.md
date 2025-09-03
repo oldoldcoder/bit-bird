@@ -1,5 +1,7 @@
 # 像素小鸟游戏 🐦
 
+全程cursor编写
+
 一个使用纯JavaScript、HTML5 Canvas和CSS3开发的经典像素风格小鸟游戏。
 
 ## 🎮 游戏特性
