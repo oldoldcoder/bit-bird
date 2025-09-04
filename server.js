@@ -23,7 +23,7 @@ const GAME_PARAMS = {
 };
 
 const ROOM = {
-  clients: [], // {ws, id}
+  clients: [], // {ws, id, ready}
   state: null,
   interval: null,
   countdownTimer: null,
@@ -34,8 +34,8 @@ function createInitialState() {
   return {
     score: 0,
     birds: [
-      { x: 180, y: 300, v: 0, alive: true }, // 先连在前
-      { x: 150, y: 300, v: 0, alive: true }, // 后连稍后
+      { x: 220, y: 300, v: 0, alive: true }, // 先连在前，靠前一些
+      { x: 160, y: 320, v: 0, alive: true }, // 后连稍后，并在垂直方向错开
     ],
     pipes: [],
     pipeTimer: 0,
@@ -60,7 +60,7 @@ function addClient(ws) {
     return;
   }
   const id = ROOM.clients.length + 1; // 1 或 2
-  ROOM.clients.push({ ws, id });
+  ROOM.clients.push({ ws, id, ready: false });
   ws.send(JSON.stringify({ type: 'joined', id }));
   if (ROOM.clients.length === 2) {
     broadcast({ type: 'room_ready' });
@@ -70,8 +70,11 @@ function addClient(ws) {
 function removeClient(ws) {
   ROOM.clients = ROOM.clients.filter(c => c.ws !== ws);
   stopGameLoop();
-  ROOM.state = null;
-  ROOM.started = false;
+}
+
+function bothReady() {
+  if (ROOM.clients.length < 2) return false;
+  return ROOM.clients.every(c => c.ready);
 }
 
 function startCountdown() {
@@ -96,9 +99,11 @@ function startGameLoop() {
   broadcast({ type: 'start', params: GAME_PARAMS });
   const tickRate = 1000 / 60;
   ROOM.interval = setInterval(() => {
-    step(ROOM.state);
-    broadcast({ type: 'state', state: ROOM.state });
-    if (ROOM.state.winner) {
+    const s = ROOM.state;
+    if (!s) return; // 状态可能被清空（例如客户端断开后的竞态）
+    step(s);
+    broadcast({ type: 'state', state: s });
+    if (s.winner) {
       broadcast({ type: 'game_over', winner: ROOM.state.winner, score: ROOM.state.score });
       stopGameLoop();
     }
@@ -111,6 +116,7 @@ function stopGameLoop() {
   if (ROOM.countdownTimer) clearInterval(ROOM.countdownTimer);
   ROOM.countdownTimer = null;
   ROOM.started = false;
+  ROOM.state = null;
 }
 
 function handleJump(playerId) {
@@ -119,6 +125,16 @@ function handleJump(playerId) {
   const bird = s.birds[playerId - 1];
   if (!bird || !bird.alive) return;
   bird.v = GAME_PARAMS.jumpForce;
+}
+
+function handleReady(ws) {
+  const client = ROOM.clients.find(c => c.ws === ws);
+  if (!client) return;
+  client.ready = true;
+  broadcast({ type: 'player_ready', id: client.id });
+  if (!ROOM.started && !ROOM.countdownTimer && bothReady()) {
+    startCountdown();
+  }
 }
 
 function step(state) {
@@ -154,6 +170,7 @@ function step(state) {
     }
     if (b.y > GAME_PARAMS.canvasHeight - GAME_PARAMS.birdSize) {
       b.alive = false;
+      b.y = GAME_PARAMS.canvasHeight - GAME_PARAMS.birdSize; // 卡在地面，不再穿透
     }
   });
 
@@ -186,7 +203,7 @@ wss.on('connection', ws => {
   ws.on('message', data => {
     let msg;
     try { msg = JSON.parse(data); } catch { return; }
-    if (msg.type === 'request_start') startCountdown();
+    if (msg.type === 'ready') handleReady(ws);
     if (msg.type === 'jump' && typeof msg.playerId === 'number') handleJump(msg.playerId);
   });
   ws.on('close', () => removeClient(ws));

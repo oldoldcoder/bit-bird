@@ -8,7 +8,6 @@ class PixelBirdGame {
         this.scoreElement = document.getElementById('score');
         this.scoreDisplayDiv = document.querySelector('.score-display');
         this.controlsDiv = document.querySelector('.game-controls');
-        this.startBtn = document.getElementById('startBtn');
         this.restartBtn = document.getElementById('restartBtn');
         this.gameOverDiv = document.getElementById('gameOver');
         this.finalScoreElement = document.getElementById('finalScore');
@@ -77,7 +76,6 @@ class PixelBirdGame {
         }
 
         // 初始化按钮可见性（使用 visibility 保留占位）
-        if (this.startBtn) this.startBtn.style.visibility = 'visible';
         if (this.restartBtn) this.restartBtn.style.visibility = 'hidden';
     }
     
@@ -99,31 +97,29 @@ class PixelBirdGame {
     
     
     bindEvents() {
-        // 开始游戏按钮
-        this.startBtn.addEventListener('click', () => {
-            if (this.mode === 'single') {
-                this.startGame();
-            } else {
-                this.startMultiplayer();
-            }
-        });
-        
         // 重新开始按钮
         this.restartBtn.addEventListener('click', () => this.startGame());
         
         // 再玩一次按钮
         this.playAgainBtn.addEventListener('click', () => this.startGame());
 
-        // 模式选择
-        if (this.singleBtn) this.singleBtn.addEventListener('click', () => this.setMode('single'));
-        if (this.multiBtn) this.multiBtn.addEventListener('click', () => this.setMode('multi'));
-        if (this.readyStartBtn) this.readyStartBtn.addEventListener('click', () => this.requestServerStart());
+        // 模式选择：点击即开局并隐藏模式按钮
+        if (this.singleBtn) this.singleBtn.addEventListener('click', () => { this.setMode('single'); this.startGame(); this.hideModeButtons(); });
+        if (this.multiBtn) this.multiBtn.addEventListener('click', () => { this.setMode('multi'); this.startMultiplayer(); this.hideModeButtons(); });
+        if (this.readyStartBtn) this.readyStartBtn.addEventListener('click', () => this.sendReady());
         
         // 键盘事件
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && this.gameRunning) {
                 e.preventDefault();
-                this.jump();
+                if (this.mode === 'single') {
+                    this.jump();
+                } else {
+                    // 多人：向服务器发送跳跃
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.playerId) {
+                        this.ws.send(JSON.stringify({ type: 'jump', playerId: this.playerId }));
+                    }
+                }
             }
         });
         
@@ -148,7 +144,6 @@ class PixelBirdGame {
         this.pipes = [];
         this.pipeTimer = 0;
         
-        this.startBtn.style.visibility = 'hidden';
         this.restartBtn.style.visibility = 'visible';
         this.gameOverDiv.style.display = 'none';
         
@@ -156,6 +151,11 @@ class PixelBirdGame {
         if (this.mode === 'single') {
             this.gameLoop();
         }
+    }
+
+    hideModeButtons() {
+        const mode = document.querySelector('.mode-select');
+        if (mode) mode.style.display = 'none';
     }
     
     jump() {
@@ -499,7 +499,12 @@ class PixelBirdGame {
             }
             if (msg.type === 'room_ready') {
                 if (this.readyStartBtn) this.readyStartBtn.disabled = false;
-                if (this.waitingText) this.waitingText.textContent = '双方已就绪，点击开始';
+                if (this.waitingText) this.waitingText.textContent = '双方进入房间，请双方点击准备';
+                if (this.readyStartBtn) this.readyStartBtn.textContent = '准备';
+            }
+            if (msg.type === 'player_ready') {
+                // 可根据需要展示哪个玩家已准备
+                if (this.waitingText) this.waitingText.textContent = '有人已准备，等待双方都准备...';
             }
             if (msg.type === 'countdown') {
                 this.showCountdown(msg.value);
@@ -519,8 +524,10 @@ class PixelBirdGame {
                 this.render();
             }
             if (msg.type === 'game_over') {
+                this.gameRunning = false;
                 this.gameOver = true;
-                this.finalScoreElement.textContent = msg.score ?? this.score;
+                this.score = msg.score ?? this.score;
+                this.finalScoreElement.textContent = this.score;
                 this.gameOverDiv.style.display = 'block';
             }
         };
@@ -532,10 +539,13 @@ class PixelBirdGame {
         };
     }
 
-    requestServerStart() {
+    sendReady() {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: 'request_start' }));
-            if (this.readyStartBtn) this.readyStartBtn.disabled = true;
+            this.ws.send(JSON.stringify({ type: 'ready' }));
+            if (this.readyStartBtn) {
+                this.readyStartBtn.disabled = true;
+                this.readyStartBtn.textContent = '已准备，等待对手';
+            }
         }
     }
 
