@@ -130,6 +130,8 @@ function stopGameLoop() {
   ROOM.countdownTimer = null;
   ROOM.started = false;
   ROOM.state = null;
+  // 重置两侧准备状态，避免上一局的 ready 残留导致下一局一人点击即可开始
+  ROOM.clients.forEach(c => { c.ready = false; });
 }
 
 function handleJump(playerId) {

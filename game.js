@@ -631,6 +631,7 @@ class PixelBirdGame {
         }
         if (this.waitingText) this.waitingText.textContent = '双方进入房间，请双方点击准备';
         // 通知服务器本客户端准备状态需要重新确认（不自动 ready）
+        // 可选：清空本地关于对手已准备的提示
     }
 
     showCountdown(value) {
