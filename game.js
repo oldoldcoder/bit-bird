@@ -545,16 +545,16 @@ class PixelBirdGame {
                 this.showCountdown(msg.value);
             }
             if (msg.type === 'start') {
+                // 服务端宣告正式开始，此时才进入游戏并隐藏等待层
                 this.serverState = null;
+                this.gameRunning = true;
+                this.gameOver = false;
+                this.hideWaiting();
             }
             if (msg.type === 'state') {
-                // 接收 authoritative 状态，进入渲染模式
+                // 接收 authoritative 状态。不要在这里更改等待层或 gameRunning，
+                // 仅在收到 start 后才进入游戏，避免误闪烁
                 this.serverState = msg.state;
-                if (!this.gameRunning) {
-                    this.gameRunning = true;
-                    this.gameOver = false;
-                    this.hideWaiting();
-                }
                 // 在多人模式下，不本地推进逻辑；仅靠服务端帧
                 this.render();
             }

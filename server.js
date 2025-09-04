@@ -107,6 +107,7 @@ function startGameLoop() {
     ROOM.clients[0] ? ROOM.clients[0].color : '#FFD700',
     ROOM.clients[1] ? ROOM.clients[1].color : '#1ABC9C'
   ];
+  // 先广播 start 让客户端显式进入游戏，再开始推状态
   broadcast({ type: 'start', params: GAME_PARAMS });
   const tickRate = 1000 / 60;
   ROOM.interval = setInterval(() => {
