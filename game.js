@@ -115,6 +115,17 @@ class PixelBirdGame {
         if (this.singleBtn) this.singleBtn.addEventListener('click', () => { this.setMode('single'); this.startGame(); this.hideModeButtons(); });
         if (this.multiBtn) this.multiBtn.addEventListener('click', () => { this.setMode('multi'); this.startMultiplayer(); this.hideModeButtons(); });
         if (this.readyStartBtn) this.readyStartBtn.addEventListener('click', () => this.sendReady());
+
+        // 等待界面：昵称与颜色变化即上报
+        if (this.playerNameInput) {
+            this.playerNameInput.addEventListener('change', () => this.sendNameIfAny());
+            this.playerNameInput.addEventListener('blur', () => this.sendNameIfAny());
+            this.playerNameInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') this.sendNameIfAny(); });
+        }
+        if (this.playerColorInput) {
+            this.playerColorInput.addEventListener('change', () => this.sendColorIfAny());
+            this.playerColorInput.addEventListener('input', () => this.sendColorIfAny());
+        }
         
         // 键盘事件
         document.addEventListener('keydown', (e) => {
@@ -496,8 +507,16 @@ class PixelBirdGame {
         }
         this.attachWsHandlers();
         this.showWaiting(true, '匹配对手中...');
-        // 尝试在连接建立后发送昵称与颜色
-        setTimeout(() => { this.sendNameIfAny(); this.sendColorIfAny(); }, 300);
+        // 等待连接 OPEN 再发送昵称与颜色，避免丢包
+        const trySendMeta = () => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.sendNameIfAny();
+                this.sendColorIfAny();
+            } else {
+                setTimeout(trySendMeta, 200);
+            }
+        };
+        trySendMeta();
     }
 
     attachWsHandlers() {
@@ -511,6 +530,12 @@ class PixelBirdGame {
                 if (this.readyStartBtn) this.readyStartBtn.disabled = false;
                 if (this.waitingText) this.waitingText.textContent = '双方进入房间，请双方点击准备';
                 if (this.readyStartBtn) this.readyStartBtn.textContent = '准备';
+            }
+            if (msg.type === 'lobby_name_update') {
+                // 可用于在等待层显示对手昵称，当前只确保本地保留输入
+            }
+            if (msg.type === 'lobby_color_update') {
+                // 同上，可扩展为等待界面显示双方颜色
             }
             if (msg.type === 'player_ready') {
                 // 可根据需要展示哪个玩家已准备
@@ -552,6 +577,9 @@ class PixelBirdGame {
 
     sendReady() {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            // 确保使用最新昵称与颜色
+            this.sendNameIfAny();
+            this.sendColorIfAny();
             this.ws.send(JSON.stringify({ type: 'ready' }));
             if (this.readyStartBtn) {
                 this.readyStartBtn.disabled = true;
@@ -595,12 +623,13 @@ class PixelBirdGame {
         this.gameRunning = false;
         this.gameOver = false;
         this.gameOverDiv.style.display = 'none';
+        // 先显示等待层，再手动恢复按钮状态，避免 showWaiting 覆盖
+        this.showWaiting(true);
         if (this.readyStartBtn) {
             this.readyStartBtn.disabled = false;
             this.readyStartBtn.textContent = '准备';
         }
         if (this.waitingText) this.waitingText.textContent = '双方进入房间，请双方点击准备';
-        this.showWaiting(true);
         // 通知服务器本客户端准备状态需要重新确认（不自动 ready）
     }
 

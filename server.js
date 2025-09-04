@@ -61,7 +61,8 @@ function addClient(ws) {
     return;
   }
   const id = ROOM.clients.length + 1; // 1 或 2
-  ROOM.clients.push({ ws, id, ready: false, name: '', color: '#FFD700' });
+  const defaultColor = id === 1 ? '#FFD700' : '#1ABC9C';
+  ROOM.clients.push({ ws, id, ready: false, name: '', color: defaultColor });
   ws.send(JSON.stringify({ type: 'joined', id }));
   if (ROOM.clients.length === 2) {
     broadcast({ type: 'room_ready' });
@@ -101,7 +102,7 @@ function startGameLoop() {
   ROOM.clients.forEach(c => {
     ROOM.state.names[c.id - 1] = c.name || `用户${c.id}`;
   });
-  // 同步颜色
+  // 同步颜色（基于当前客户端保存的 color）
   ROOM.state.colors = [
     ROOM.clients[0] ? ROOM.clients[0].color : '#FFD700',
     ROOM.clients[1] ? ROOM.clients[1].color : '#1ABC9C'
@@ -153,6 +154,10 @@ function handleSetName(ws, name) {
   const client = ROOM.clients.find(c => c.ws === ws);
   if (!client) return;
   client.name = String(name || '').slice(0, 12);
+  // 若游戏尚未开始，同时把名字回传给两端以便立刻显示
+  if (!ROOM.started && ROOM.clients.length > 0) {
+    broadcast({ type: 'lobby_name_update', id: client.id, name: client.name || `用户${client.id}` });
+  }
 }
 
 function handleSetColor(ws, color) {
@@ -160,6 +165,9 @@ function handleSetColor(ws, color) {
   if (!client) return;
   const hex = String(color || '').trim();
   if (/^#[0-9a-fA-F]{6}$/.test(hex)) client.color = hex;
+  if (!ROOM.started && ROOM.clients.length > 0) {
+    broadcast({ type: 'lobby_color_update', id: client.id, color: client.color });
+  }
 }
 
 function step(state) {
