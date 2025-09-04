@@ -19,6 +19,8 @@ class PixelBirdGame {
         this.waitingText = document.getElementById('waitingText');
         this.readyStartBtn = document.getElementById('readyStartBtn');
         this.countdownEl = document.getElementById('countdown');
+        this.playerNameInput = document.getElementById('playerName');
+        this.playerColorInput = document.getElementById('playerColor');
         
         // 游戏状态
         this.gameRunning = false;
@@ -101,7 +103,13 @@ class PixelBirdGame {
         this.restartBtn.addEventListener('click', () => this.startGame());
         
         // 再玩一次按钮
-        this.playAgainBtn.addEventListener('click', () => this.startGame());
+        this.playAgainBtn.addEventListener('click', () => {
+            if (this.mode === 'single') {
+                this.startGame();
+            } else {
+                this.returnToReadyLobby();
+            }
+        });
 
         // 模式选择：点击即开局并隐藏模式按钮
         if (this.singleBtn) this.singleBtn.addEventListener('click', () => { this.setMode('single'); this.startGame(); this.hideModeButtons(); });
@@ -488,6 +496,8 @@ class PixelBirdGame {
         }
         this.attachWsHandlers();
         this.showWaiting(true, '匹配对手中...');
+        // 尝试在连接建立后发送昵称与颜色
+        setTimeout(() => { this.sendNameIfAny(); this.sendColorIfAny(); }, 300);
     }
 
     attachWsHandlers() {
@@ -526,8 +536,9 @@ class PixelBirdGame {
             if (msg.type === 'game_over') {
                 this.gameRunning = false;
                 this.gameOver = true;
+                const winnerName = msg.winnerName || '平局';
                 this.score = msg.score ?? this.score;
-                this.finalScoreElement.textContent = this.score;
+                this.finalScoreElement.textContent = `${winnerName} 赢得了比赛 (分数: ${this.score})`;
                 this.gameOverDiv.style.display = 'block';
             }
         };
@@ -549,6 +560,24 @@ class PixelBirdGame {
         }
     }
 
+    sendNameIfAny() {
+        if (!this.playerNameInput) return;
+        const name = (this.playerNameInput.value || '').trim();
+        if (!name) return;
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'set_name', name }));
+        }
+    }
+
+    sendColorIfAny() {
+        if (!this.playerColorInput) return;
+        const color = (this.playerColorInput.value || '').trim();
+        if (!color) return;
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'set_color', color }));
+        }
+    }
+
     showWaiting(show, text) {
         if (!this.waitingOverlay) return;
         this.waitingOverlay.style.display = show ? 'block' : 'none';
@@ -559,6 +588,20 @@ class PixelBirdGame {
 
     hideWaiting() {
         if (this.waitingOverlay) this.waitingOverlay.style.display = 'none';
+    }
+
+    returnToReadyLobby() {
+        // 清理对局状态，回到等待层
+        this.gameRunning = false;
+        this.gameOver = false;
+        this.gameOverDiv.style.display = 'none';
+        if (this.readyStartBtn) {
+            this.readyStartBtn.disabled = false;
+            this.readyStartBtn.textContent = '准备';
+        }
+        if (this.waitingText) this.waitingText.textContent = '双方进入房间，请双方点击准备';
+        this.showWaiting(true);
+        // 通知服务器本客户端准备状态需要重新确认（不自动 ready）
     }
 
     showCountdown(value) {
@@ -592,9 +635,9 @@ class PixelBirdGame {
         s.birds.forEach((b, idx) => {
             this.bird.x = b.x;
             this.bird.y = b.y;
-            // 先连玩家用金色，后连用青色区分
+            const color = (s.colors && s.colors[idx]) ? s.colors[idx] : (idx === 0 ? '#FFD700' : '#1ABC9C');
             const originalFill = this.ctx.fillStyle;
-            this.drawBirdWithColor(idx === 0 ? '#FFD700' : '#1ABC9C');
+            this.drawBirdWithColor(color);
             this.ctx.fillStyle = originalFill;
         });
         this.bird.x = oldX; this.bird.y = oldY; this.bird.size = oldSize;
@@ -602,6 +645,17 @@ class PixelBirdGame {
         // 画分数
         this.score = s.score;
         this.drawScoreHUD();
+
+        // 绘制昵称（像素字体风格）
+        this.ctx.save();
+        this.ctx.font = '14px Courier New';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillStyle = '#ffffff';
+        s.birds.forEach((b, idx) => {
+            const name = (s.names && s.names[idx]) ? s.names[idx] : (idx === 0 ? '用户1' : '用户2');
+            this.ctx.fillText(name, b.x + this.bird.size / 2, b.y + this.bird.size + 16);
+        });
+        this.ctx.restore();
     }
 
     drawBirdWithColor(bodyColor) {

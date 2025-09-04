@@ -36,6 +36,11 @@
         <div class="waiting-overlay" id="waiting" style="display: none;">
             <div class="waiting-box">
                 <p id="waitingText">匹配对手中...</p>
+                <input id="playerName" class="name-input" type="text" placeholder="给自己起个名字 (可选)" maxlength="12" />
+                <div class="color-picker">
+                    <label for="playerColor">小鸟颜色: </label>
+                    <input id="playerColor" type="color" value="#FFD700" />
+                </div>
                 <button id="readyStartBtn" disabled>开始(等待对手)</button>
                 <div id="countdown" class="countdown" style="display:none;">3</div>
             </div>

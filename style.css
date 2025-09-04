@@ -81,6 +81,18 @@ body {
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
+.name-input {
+    width: 260px;
+    padding: 10px 12px;
+    margin: 10px 0 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-family: 'Courier New', monospace;
+}
+.color-picker {
+    margin: 6px 0 12px;
+    color: #2c3e50;
+}
 .waiting-box button[disabled] {
     background: #95a5a6;
     cursor: not-allowed;

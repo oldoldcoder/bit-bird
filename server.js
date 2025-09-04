@@ -23,7 +23,7 @@ const GAME_PARAMS = {
 };
 
 const ROOM = {
-  clients: [], // {ws, id, ready}
+  clients: [], // {ws, id, ready, name, color}
   state: null,
   interval: null,
   countdownTimer: null,
@@ -37,6 +37,7 @@ function createInitialState() {
       { x: 220, y: 300, v: 0, alive: true }, // 先连在前，靠前一些
       { x: 160, y: 320, v: 0, alive: true }, // 后连稍后，并在垂直方向错开
     ],
+    names: ['', ''],
     pipes: [],
     pipeTimer: 0,
     pipeInterval: 120,
@@ -60,7 +61,7 @@ function addClient(ws) {
     return;
   }
   const id = ROOM.clients.length + 1; // 1 或 2
-  ROOM.clients.push({ ws, id, ready: false });
+  ROOM.clients.push({ ws, id, ready: false, name: '', color: '#FFD700' });
   ws.send(JSON.stringify({ type: 'joined', id }));
   if (ROOM.clients.length === 2) {
     broadcast({ type: 'room_ready' });
@@ -96,6 +97,15 @@ function startCountdown() {
 function startGameLoop() {
   ROOM.started = true;
   ROOM.state = createInitialState();
+  // 将昵称同步到状态
+  ROOM.clients.forEach(c => {
+    ROOM.state.names[c.id - 1] = c.name || `用户${c.id}`;
+  });
+  // 同步颜色
+  ROOM.state.colors = [
+    ROOM.clients[0] ? ROOM.clients[0].color : '#FFD700',
+    ROOM.clients[1] ? ROOM.clients[1].color : '#1ABC9C'
+  ];
   broadcast({ type: 'start', params: GAME_PARAMS });
   const tickRate = 1000 / 60;
   ROOM.interval = setInterval(() => {
@@ -104,7 +114,9 @@ function startGameLoop() {
     step(s);
     broadcast({ type: 'state', state: s });
     if (s.winner) {
-      broadcast({ type: 'game_over', winner: ROOM.state.winner, score: ROOM.state.score });
+      const winner = s.winner;
+      const winnerName = winner === 1 || winner === 2 ? (s.names[winner - 1] || `用户${winner}`) : '平局';
+      broadcast({ type: 'game_over', winner, winnerName, score: s.score });
       stopGameLoop();
     }
   }, tickRate);
@@ -135,6 +147,19 @@ function handleReady(ws) {
   if (!ROOM.started && !ROOM.countdownTimer && bothReady()) {
     startCountdown();
   }
+}
+
+function handleSetName(ws, name) {
+  const client = ROOM.clients.find(c => c.ws === ws);
+  if (!client) return;
+  client.name = String(name || '').slice(0, 12);
+}
+
+function handleSetColor(ws, color) {
+  const client = ROOM.clients.find(c => c.ws === ws);
+  if (!client) return;
+  const hex = String(color || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) client.color = hex;
 }
 
 function step(state) {
@@ -205,6 +230,8 @@ wss.on('connection', ws => {
     try { msg = JSON.parse(data); } catch { return; }
     if (msg.type === 'ready') handleReady(ws);
     if (msg.type === 'jump' && typeof msg.playerId === 'number') handleJump(msg.playerId);
+    if (msg.type === 'set_name') handleSetName(ws, msg.name);
+    if (msg.type === 'set_color') handleSetColor(ws, msg.color);
   });
   ws.on('close', () => removeClient(ws));
 });
